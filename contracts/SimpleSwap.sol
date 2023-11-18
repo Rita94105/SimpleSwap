@@ -45,28 +45,32 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         }
     }
 
-    function getReserves() external view override returns (uint256 _reserveA, uint256 _reserveB){
+    function getReserves() external view override returns (uint256 _reserveA, uint256 _reserveB) {
         _reserveA = reserveA;
         _reserveB = reserveB;
     }
 
-    function getTokenA() external view override returns (address _tokenA){
+    function getTokenA() external view override returns (address _tokenA) {
         _tokenA = tokenA;
     }
 
-    function getTokenB() external view override returns (address _tokenB){
+    function getTokenB() external view override returns (address _tokenB) {
         _tokenB = tokenB;
     }
 
-    function iscontract(address _addr) private view returns (bool){
+    function iscontract(address _addr) internal view returns (bool) {
         uint256 length;
         assembly {
             length := extcodesize(_addr)
         }
         return (length > 0);
     }
-    
-    function swap(address tokenIn, address tokenOut, uint256 amountIn) external virtual override returns (uint256 amountOut){
+
+    function swap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn
+    ) external virtual override returns (uint256 amountOut) {
         //revert_when_tokenIn_is_not_tokenA_or_tokenB
         require(tokenIn == tokenA || tokenIn == tokenB, "SimpleSwap: INVALID_TOKEN_IN");
         //revert_when_tokenOut_is_not_tokenA_or_tokenB
@@ -78,7 +82,7 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         //calculate amountOut
         uint256 reserveIn = tokenIn == tokenA ? reserveA : reserveB;
         uint256 reserveOut = tokenOut == tokenA ? reserveA : reserveB;
-        amountOut = amountIn * reserveOut / (reserveIn + amountIn);
+        amountOut = (amountIn * reserveOut) / (reserveIn + amountIn);
         //revert_when_amountOut_is_zero
         require(amountOut > 0, "SimpleSwap: INSUFFICIENT_OUTPUT_AMOUNT");
         //revert_when_amountOut_is_more_than_reserveOut
@@ -88,7 +92,7 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         //transfer tokenOut to msg.sender
         IERC20(tokenOut).transfer(msg.sender, amountOut);
         //update reserveA and reserveB
-        if(tokenIn == tokenA){
+        if (tokenIn == tokenA) {
             reserveA += amountIn;
             reserveB -= amountOut;
         } else {
@@ -101,13 +105,13 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         //check x*y=k
         require(balanceA * balanceB == reserveA * reserveB, "SimpleSwap: K");
         _update(balanceA, balanceB);
-        emit Swap(msg.sender,tokenIn, tokenOut, amountIn, amountOut);
+        emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function addLiquidity(
         uint256 amountAIn,
         uint256 amountBIn
-    ) external virtual override returns (uint256 _amountA, uint256 _amountB, uint256 liquidity){
+    ) external virtual override returns (uint256 _amountA, uint256 _amountB, uint256 liquidity) {
         //revert when_tokenA_amount_is_zero
         require(amountAIn > 0, "SimpleSwap: INSUFFICIENT_INPUT_AMOUNT");
         //revert when_tokenB_amount_is_zero
@@ -124,7 +128,7 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         emit AddLiquidity(msg.sender, _amountA, _amountB, liquidity);
     }
 
-    function removeLiquidity(uint256 liquidity) external virtual override returns (uint256 _amountA, uint256 _amountB){
+    function removeLiquidity(uint256 liquidity) external virtual override returns (uint256 _amountA, uint256 _amountB) {
         //revert_removeLiquidity_when_lp_token_balance_is_zero
         require(liquidity > 0, "SimpleSwap: INSUFFICIENT_LIQUIDITY_BURNED");
         _transfer(msg.sender, address(this), liquidity);
@@ -138,11 +142,11 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         uint amountA_ = balanceA - reserveA;
         uint amountB_ = balanceB - reserveB;
 
-        uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
+        uint _totalSupply = totalSupply();
         if (_totalSupply == 0) {
             liquidity = Math.sqrt(amountA_ * amountB_);
         } else {
-            liquidity = Math.min(amountA_ * _totalSupply / reserveA, amountB_ * _totalSupply / reserveB);
+            liquidity = Math.min((amountA_ * _totalSupply) / reserveA, (amountB_ * _totalSupply) / reserveB);
         }
         require(liquidity > 0, "SimpleSwap: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(_to, liquidity);
@@ -155,9 +159,9 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
         uint balanceB = IERC20(tokenB).balanceOf(address(this));
         uint liquidity = balanceOf(address(this));
 
-        uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
-        _amountA = liquidity * balanceA / _totalSupply; // using balances ensures pro-rata distribution
-        _amountB = liquidity * balanceB / _totalSupply; // using balances ensures pro-rata distribution
+        uint _totalSupply = totalSupply();
+        _amountA = (liquidity * balanceA) / _totalSupply;
+        _amountB = (liquidity * balanceB) / _totalSupply;
         require(_amountA > 0 && _amountB > 0, "SimpleSwap: INSUFFICIENT_LIQUIDITY_BURNED");
         _burn(address(this), liquidity);
         _safeTransfer(tokenA, _to, _amountA);
@@ -172,19 +176,23 @@ contract SimpleSwap is ISimpleSwap, ERC20 {
     function quote(uint _amountA, uint _reserveA, uint _reserveB) internal pure returns (uint _amountB) {
         require(_amountA > 0, "SimpleSwap: INSUFFICIENT_AMOUNT");
         require(_reserveA > 0 && _reserveB > 0, "SimpleSwap: INSUFFICIENT_LIQUIDITY");
-        _amountB = _amountA * _reserveB / _reserveA;
+        _amountB = (_amountA * _reserveB) / _reserveA;
     }
 
     function _safeTransfer(address _token, address _to, uint _value) private {
         (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(SELECTOR, _to, _value));
         require(success && (data.length == 0 || abi.decode(data, (bool))), "SimpleSwap: TRANSFER_FAILED");
     }
-    function _addLiquidity(uint256 amountADesired, uint256 amountBDesired) internal virtual returns (uint256 _amountA, uint256 _amountB){
-        if(reserveA == 0 && reserveB == 0){
+
+    function _addLiquidity(
+        uint256 amountADesired,
+        uint256 amountBDesired
+    ) internal virtual returns (uint256 _amountA, uint256 _amountB) {
+        if (reserveA == 0 && reserveB == 0) {
             (_amountA, _amountB) = (amountADesired, amountBDesired);
         } else {
             uint256 amountBOptimal = quote(amountADesired, reserveA, reserveB);
-            if(amountBOptimal <= amountBDesired){
+            if (amountBOptimal <= amountBDesired) {
                 require(amountBOptimal > 0, "SimpleSwap: INSUFFICIENT_B_AMOUNT");
                 (_amountA, _amountB) = (amountADesired, amountBOptimal);
             } else {
